@@ -40,7 +40,20 @@ def generate_alt_text_from_image(img: Image.Image, max_words: int = 10) -> str:
     except Exception as e:
         return f"Error: {e}"
 
-def batch_from_urls(urls: List[str], max_words: int = 10) -> List[Tuple[str, str]]:
+def rewrite_caption(caption: str, tone: str) -> str:
+    """Adjust the caption based on tone selection."""
+    if tone == "Professional":
+        return f"A professional description of this image: {caption}"
+    elif tone == "Casual":
+        return f"Looks like {caption.lower()}."
+    elif tone == "Playful":
+        return f"Fun vibe: {caption} 🎉"
+    elif tone == "SEO-Friendly":
+        return f"{caption} | High-quality image for website SEO."
+    else:  # Default
+        return caption
+
+def batch_from_urls(urls: List[str], max_words: int = 10, tone: str = "Default") -> List[Tuple[str, str]]:
     results = []
     for url in urls:
         u = url.strip()
@@ -49,6 +62,7 @@ def batch_from_urls(urls: List[str], max_words: int = 10) -> List[Tuple[str, str
         try:
             img = fetch_image_from_url(u)
             alt = generate_alt_text_from_image(img, max_words=max_words)
+            alt = rewrite_caption(alt, tone)
             results.append((u, alt))
         except Exception as e:
             results.append((u, f"Error: {e}"))
@@ -69,7 +83,8 @@ st.write("Generate short, SEO-friendly alt text from image **URLs** or **uploads
 with st.sidebar:
     st.header("⚙️ Settings")
     max_words = st.slider("Max words in alt text", 5, 16, 10)
-    st.caption("Best practice: keep alt text concise and descriptive.")
+    tone = st.selectbox("Tone", ["Default", "Professional", "Casual", "Playful", "SEO-Friendly"])
+    st.caption("Choose how the alt text should sound.")
 
 tab1, tab2, tab3 = st.tabs(["🔗 Single URL", "📝 Multiple URLs", "📂 Upload Images"])
 
@@ -100,13 +115,14 @@ st.markdown("""
 # --- Single URL ---
 with tab1:
     url = st.text_input("Paste an Image URL")
-    if st.button("Generate", use_container_width=True):
+    if st.button("Generate", use_container_width=True, key="single"):
         if not url.strip():
             st.warning("Please paste an image URL.")
         else:
             try:
                 img = fetch_image_from_url(url.strip())
                 alt = generate_alt_text_from_image(img, max_words=max_words)
+                alt = rewrite_caption(alt, tone)
                 st.markdown(f"""
                     <div class="alt-card">
                         <p><b>Alt Text:</b> {alt}</p>
@@ -120,12 +136,12 @@ with tab1:
 with tab2:
     st.write("Paste one image URL **per line**:")
     urls_text = st.text_area("URLs", height=160, placeholder="https://.../image1.jpg\nhttps://.../image2.png")
-    if st.button("Generate for All", use_container_width=True):
+    if st.button("Generate for All", use_container_width=True, key="multi"):
         urls = [u for u in urls_text.splitlines() if u.strip()]
         if not urls:
             st.warning("Please paste at least one URL.")
         else:
-            results = batch_from_urls(urls, max_words=max_words)
+            results = batch_from_urls(urls, max_words=max_words, tone=tone)
             for u, alt in results:
                 st.markdown(f"""
                     <div class="alt-card">
@@ -139,7 +155,7 @@ with tab2:
 # --- Upload Images ---
 with tab3:
     uploads = st.file_uploader("Upload JPG/PNG", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
-    if st.button("Generate for Uploads", use_container_width=True):
+    if st.button("Generate for Uploads", use_container_width=True, key="uploads"):
         if not uploads:
             st.warning("Please upload at least one image.")
         else:
@@ -148,6 +164,7 @@ with tab3:
                 try:
                     img = Image.open(f).convert("RGB")
                     alt = generate_alt_text_from_image(img, max_words=max_words)
+                    alt = rewrite_caption(alt, tone)
                     st.markdown(f"""
                         <div class="alt-card">
                             <p><b>File:</b> {f.name}</p>
@@ -165,11 +182,3 @@ with tab3:
                     w.writerow(r)
                 st.download_button("⬇ Download CSV", data=buf.getvalue().encode("utf-8"),
                                    file_name="alt_text_uploads.csv", mime="text/csv")
-
-
-
-
-
-
-
-
